@@ -113,6 +113,8 @@ var player   = {
         if (this.ammo > 0) {
             bullets.push(new Bullet(this.x + this.offset_x, this.y));
             this.ammo--;
+        } else {
+            texts.push(new Text("no ammo!", this.x, this.y, 1500));
         }
     },
     
@@ -171,11 +173,12 @@ function Monster(x, y) {
     this.x = x;
     this.y = y;
     
+    this.speed = 0.025 + Math.random() * 0.025;
+    
     this.lifetime = 0;
     this.active   = true;
 }
 
-Monster.prototype.speed  = 0.05;
 Monster.prototype.step   = 125;
 Monster.prototype.offset = 15;
 
@@ -199,13 +202,27 @@ Monster.prototype.update = function(lapse) {
         
         score++;
         
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.15) {
             objects.push(new Ammo_box(
+                Math.random() * 200,
+                Math.random() * height
+            ));
+        } else if (Math.random() < 1 / 17) {
+            objects.push(new Health_box(
                 Math.random() * 200,
                 Math.random() * height
             ));
         }
         
+        this.active = false;
+    }
+    
+    if (
+        Math.abs(player.x - this.x) < this.offset + player.offset_x &&
+        Math.abs(player.y - this.y) < this.offset + player.offset_y
+    ) {
+        texts.push(new Text("-1 health", this.x, this.y, 1500));
+        player.collision();
         this.active = false;
     }
     
@@ -217,10 +234,10 @@ Monster.prototype.update = function(lapse) {
 
 var spawn_time = null;
 
-function spawn_monster() {
+function spawn_monster(time) {
     monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
     
-    spawn_time += Math.random() * 1500;
+    spawn_time = time + Math.random() * 1500;
 }
 
 function Ammo_box(x, y) {
@@ -247,6 +264,33 @@ Ammo_box.prototype.update = function(lapse) {
         texts.push(new Text("+10 ammo", this.x, this.y, 1500));
     }
 };
+
+function Health_box(x, y) {
+    this.x = x;
+    this.y = y;
+    
+    this.active = true;
+}
+
+Health_box.prototype.offset = 10;
+
+Health_box.prototype.update = function(lapse) {
+    if (
+        this.x > player.x - this.offset - player.offset_x &&
+        this.y > player.y - this.offset - player.offset_y &&
+        this.x < player.x + this.offset + player.offset_x &&
+        this.y < player.y + this.offset + player.offset_y
+    ) {
+        this.active = false;
+        if (player.health < 10) {
+            player.health += 2;
+            texts.push(new Text("+2 health", this.x, this.y, 1500));
+        } else {
+            player.ammo += 10;
+            texts.push(new Text("+10 ammo", this.x, this.y, 1500));
+        }
+    }
+}
 
 function Text(text, x, y, lifetime) {
     //text: 8 pixels per character in Arial at 12 pts
@@ -293,9 +337,9 @@ function animate(time) {
         
         if (spawn_time == null) {
             spawn_time = time;
-            spawn_monster();
+            spawn_monster(time);
         } else if (spawn_time < time) {
-            spawn_monster();
+            spawn_monster(time);
         }
     }
     
@@ -360,8 +404,10 @@ function draw_frame() {
     });
     
     //draw ammo boxes
-    context.fillStyle = "forestgreen";
+    //context.fillStyle = "forestgreen";
     objects.forEach((o) => {
+    if (o instanceof Ammo_box) context.fillStyle = "forestgreen";
+    if (o instanceof Health_box) context.fillStyle = "mediumspringgreen";
         context.fillRect(
             o.x - o.offset,
             o.y - o.offset,
@@ -385,5 +431,8 @@ function draw_frame() {
         "no ammo? you're screwed!" :
         "ammo: " + player.ammo),
         5, 30);
-    context.fillText("score: " + score, 5, 50);
+    context.fillText(
+        (player.health > 0 ? "health: " + player.health : "you're dead!"),
+        5, 50);
+    context.fillText("score: " + score, 5, 70);
 }
