@@ -1,0 +1,389 @@
+
+var canvas;
+var context;
+var width, height;
+
+function init() {
+    canvas  = document.querySelector("canvas");
+    context = canvas.getContext("2d");
+    
+    canvas.width  = width  = window.innerWidth;
+    canvas.height = height = window.innerHeight;
+    
+    //set up the player and stuff
+    player.x      = 30;
+    player.y      = height / 2;
+    player.health = 15;
+    player.ammo   = 20;
+    
+    //set up the event handlers
+    addEventListener("keydown", keydown);
+    addEventListener("keyup", keyup);
+    addEventListener("keyup", function(e) {
+        if (e.keyCode == 80) {
+            paused = !paused;
+        } else if (e.code == "Space") {
+            player.fire();
+        }
+    });
+    
+    requestAnimationFrame(animate);
+}
+
+function end_game() {
+    playing = false;
+    alert("game over. score: " + score);
+}
+
+// event handlers --------------------------------------------------------------
+var keys = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+};
+
+/* keycodes
+ * w: 87, a: 65, s: 83, d: 68
+ * left: 37, up: 38, right: 39, down: 40
+ * space: 32, shift: 16, p: 80
+ */
+function keydown(e) {
+    e.preventDefault();
+    switch (e.keyCode) {
+        case 38:
+        case 87:
+            keys.up = true;
+            break;
+        case 40:
+        case 83:
+            keys.down = true;
+            break;
+        case 37:
+        case 65:
+            keys.left = true;
+            break;
+        case 39:
+        case 68:
+            keys.right = true;
+            break;
+    }
+}
+
+function keyup(e) {
+    switch (e.keyCode) {
+        case 38:
+        case 87:
+            keys.up = false;
+            break;
+        case 40:
+        case 83:
+            keys.down = false;
+            break;
+        case 37:
+        case 65:
+            keys.left = false;
+            break;
+        case 39:
+        case 68:
+            keys.right = false;
+            break;
+    }
+}
+
+//data for the game ------------------------------------------------------------
+
+var score = 0;
+
+var monsters = [];
+var bullets  = [];
+var objects  = [];
+var texts    = [];
+var player   = {
+    x: null,
+    y: null,
+    ammo: null,
+    health: null,
+    speed: 0.2,
+    
+    offset_x: 10,
+    offset_y: 15,
+    
+    fire: function() {
+        if (this.ammo > 0) {
+            bullets.push(new Bullet(this.x + this.offset_x, this.y));
+            this.ammo--;
+        }
+    },
+    
+    collision: function() {
+        this.health--;
+    },
+    
+    update: function(lapse) {
+        var vx = 0, vy = 0;
+        
+        vx += keys.left ? -1 : 0;
+        vx += keys.right ? 1 : 0;
+        vy += keys.up ? -1 : 0;
+        vy += keys.down ? 1 : 0;
+        
+        this.x += vx * this.speed * lapse;
+        this.y += vy * this.speed * lapse;
+        
+        //keep the player within bounds
+        this.x = Math.max(this.x, this.offset_x);
+        this.x = Math.min(this.x, 200 - this.offset_x);
+        this.y = Math.max(this.y, this.offset_y);
+        this.y = Math.min(this.y, height - this.offset_y);
+        
+        if (this.health <= 0) {
+            end_game();
+        }
+    },
+};
+
+// various types ---------------------------------------------------------------
+//bullets
+function Bullet(x, y) {
+    this.x = x;
+    this.y = y;
+    
+    this.active = true;
+}
+
+Bullet.prototype.speed = 0.3;
+
+Bullet.prototype.update = function(lapse) {
+    this.x += lapse * this.speed;
+    
+    if (this.x > width) {
+        this.active = false;
+    }
+};
+
+Bullet.prototype.collision = function() {
+    this.active = false;
+};
+
+//monster
+function Monster(x, y) {
+    this.x = x;
+    this.y = y;
+    
+    this.lifetime = 0;
+    this.active   = true;
+}
+
+Monster.prototype.speed  = 0.05;
+Monster.prototype.step   = 125;
+Monster.prototype.offset = 15;
+
+Monster.prototype.update = function(lapse) {
+    //monsters move toward the left
+    this.x -= lapse * this.speed;
+    
+    var a = bullets.filter((b) => {
+        return (
+            b.x > this.x - this.offset &&
+            b.y > this.y - this.offset &&
+            b.x < this.x + this.offset &&
+            b.y < this.y + this.offset
+        );
+    });
+    
+    if (a.length > 0) {
+        a.forEach((b) => {
+            b.collision();
+        });
+        
+        score++;
+        
+        if (Math.random() < 0.2) {
+            objects.push(new Ammo_box(
+                Math.random() * 200,
+                Math.random() * height
+            ));
+        }
+        
+        this.active = false;
+    }
+    
+    if (this.x < 0) {
+        this.active = false;
+        score--;
+    }
+};
+
+var spawn_time = null;
+
+function spawn_monster() {
+    monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
+    
+    spawn_time += Math.random() * 1500;
+}
+
+function Ammo_box(x, y) {
+    this.x = x;
+    this.y = y;
+    
+    this.active = true;
+}
+
+Ammo_box.prototype.offset = 10;
+
+Ammo_box.prototype.update = function(lapse) {
+    //doesn't move. i'd be scared if it does.
+    
+    //does check for collision with the player, though.
+    if (
+        this.x > player.x - this.offset - player.offset_x &&
+        this.y > player.y - this.offset - player.offset_y &&
+        this.x < player.x + this.offset + player.offset_x &&
+        this.y < player.y + this.offset + player.offset_y
+    ) {
+        this.active = false;
+        player.ammo += 10;
+        texts.push(new Text("+10 ammo", this.x, this.y, 1500));
+    }
+};
+
+function Text(text, x, y, lifetime) {
+    //text: 8 pixels per character in Arial at 12 pts
+    //so for 16pt, it's about 11 pixels per character
+    this.text = text;
+    
+    this.x = x - (text.length / 2) * 11;
+    this.y = y;
+    
+    this.lifetime = lifetime;
+    this.life     = 0;
+    this.active   = true;
+    
+    this.alpha = 1;
+}
+
+Text.prototype.update = function(lapse) {
+    this.life += lapse;
+    
+    this.y -= lapse * 0.05;
+    
+    this.alpha = 1 - (this.life / this.lifetime);
+    
+    if (this.life >= this.lifetime) {
+        this.active = false;
+    }
+};
+
+// animation loop --------------------------------------------------------------
+var last_time = null, lapse = 0;
+var paused    = false;
+var playing   = true;
+
+function animate(time) {
+    if (last_time == null) {
+        lapse = 0;
+    } else {
+        lapse = time - last_time;
+    }
+    last_time = time;
+    
+    if (!paused && playing) {
+        cycle(lapse);
+        
+        if (spawn_time == null) {
+            spawn_time = time;
+            spawn_monster();
+        } else if (spawn_time < time) {
+            spawn_monster();
+        }
+    }
+    
+    draw_frame();
+    requestAnimationFrame(animate);
+}
+
+function cycle(lapse) {
+    //updates everything
+    player.update(lapse);
+    
+    //filter stuff
+    bullets  = bullets.filter((b) => { return b.active; });
+    monsters = monsters.filter((m) => { return m.active; });
+    objects  = objects.filter((o) => { return o.active; });
+    texts    = texts.filter((t) => { return t.active; });
+    
+    bullets.forEach((b) => { b.update(lapse); });
+    monsters.forEach((m) => { m.update(lapse); });
+    objects.forEach((o) => { o.update(lapse); });
+    texts.forEach((t) => { t.update(lapse); });
+}
+
+function draw_frame() {
+    context.clearRect(0, 0, width, height);
+    
+    //draw the line
+    context.strokeStyle = "lightslategray";
+    context.beginPath();
+    context.moveTo(200, 0);
+    context.lineTo(200, height);
+    context.closePath();
+    context.stroke();
+    
+    //draw the player
+    context.fillStyle = "dodgerblue";
+    context.fillRect(
+        player.x - player.offset_x,
+        player.y - player.offset_y,
+        player.offset_x * 2,
+        player.offset_y * 2
+    );
+    
+    //draw bullets
+    context.fillStyle = "darkorange";
+    bullets.forEach((b) => {
+        context.beginPath();
+        context.arc(b.x, b.y, 3, 0, 2 * Math.PI, false);
+        context.closePath();
+        context.fill();
+    });
+    
+    //draw monsters
+    context.fillStyle = "crimson";
+    monsters.forEach((m) => {
+        context.fillRect(
+            m.x - m.offset,
+            m.y - m.offset,
+            m.offset * 2,
+            m.offset * 2,
+        );
+    });
+    
+    //draw ammo boxes
+    context.fillStyle = "forestgreen";
+    objects.forEach((o) => {
+        context.fillRect(
+            o.x - o.offset,
+            o.y - o.offset,
+            o.offset * 2,
+            o.offset * 2
+        );
+    });
+    
+    //draw the texts
+    texts.forEach((t) => {
+        context.font      = "14pt Arial";
+        context.fillStyle = "rgba(186, 85, 211, " + t.alpha + ")";
+        context.fillText(t.text, t.x, t.y);
+    });
+    
+    //draw the ammo counter
+    context.fillStyle = "royalblue";
+    context.font      = "12pt Arial";
+    context.fillText(
+        ((player.ammo == 0 && objects.length == 0 && bullets.length == 0) ?
+        "no ammo? you're screwed!" :
+        "ammo: " + player.ammo),
+        5, 30);
+    context.fillText("score: " + score, 5, 50);
+}
