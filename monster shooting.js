@@ -35,6 +35,15 @@ function end_game() {
     alert("game over. score: " + score);
 }
 
+// sprites ---------------------------------------------------------------------
+
+var player_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/player.png";
+    
+    return elt;
+})();
+
 // event handlers --------------------------------------------------------------
 var keys = {
     up: false,
@@ -106,7 +115,7 @@ var player   = {
     health: null,
     speed: 0.2,
     
-    offset_x: 10,
+    offset_x: 8,
     offset_y: 15,
     
     fire: function() {
@@ -375,12 +384,11 @@ function draw_frame() {
     context.stroke();
     
     //draw the player
-    context.fillStyle = "dodgerblue";
-    context.fillRect(
+    //context.fillStyle = "dodgerblue";
+    context.drawImage(
+        player_sprite,
         player.x - player.offset_x,
         player.y - player.offset_y,
-        player.offset_x * 2,
-        player.offset_y * 2
     );
     
     //draw bullets
