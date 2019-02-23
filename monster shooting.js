@@ -250,7 +250,7 @@ Monster.prototype.update = function(lapse) {
     
     if (this.x < 0) {
         this.active = false;
-        score--;
+        score -= 10;
     }
     
     //now update the pose
@@ -312,7 +312,7 @@ Health_box.prototype.update = function(lapse) {
         this.y < player.y + this.offset + player.offset_y
     ) {
         this.active = false;
-        if (player.health < 10) {
+        if (player.health <= 13) {
             player.health += 2;
             texts.push(new Text("+2 health", this.x, this.y, 1500));
         } else {
