@@ -201,7 +201,7 @@ function Monster(x, y) {
     this.active   = true;
 }
 
-Monster.prototype.pose_delay = 125;
+Monster.prototype.pose_delay = 167;
 Monster.prototype.offset     = 15;
 
 Monster.prototype.update = function(lapse) {
@@ -258,7 +258,7 @@ Monster.prototype.update = function(lapse) {
     if (this.pose_time >= this.pose_delay) {
         this.pose_time = 0;
         this.pose++;
-        this.pose = this.pose % 8;
+        this.pose = this.pose % 4;
     }
 };
 
@@ -408,6 +408,12 @@ var bullet_sprite = (function() {
     return elt;
 })();
 
+var monster_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/monster.png";
+    return elt;
+})();
+
 var crate_sprite = (function() {
     var elt = document.createElement("img");
     elt.src = "sprites/crates.png";
@@ -443,13 +449,13 @@ function draw_frame() {
     });
     
     //draw monsters
-    context.fillStyle = "crimson";
     monsters.forEach((m) => {
-        context.fillRect(
-            m.x - m.offset,
-            m.y - m.offset,
-            m.offset * 2,
-            m.offset * 2,
+        context.drawImage(
+            monster_sprite,
+            0, 2 * m.offset * m.pose,
+            2 * m.offset, 2 * m.offset,
+            m.x - m.offset, m.y - m.offset,
+            2 * m.offset, 2 * m.offset
         );
     });
     
