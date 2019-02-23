@@ -350,6 +350,7 @@ function animate(time) {
 function cycle(lapse) {
     //updates everything
     player.update(lapse);
+    bot.update();
     
     //filter stuff
     bullets  = bullets.filter((b) => { return b.active; });
@@ -375,7 +376,7 @@ function draw_frame() {
     context.stroke();
     
     //draw the player
-    context.fillStyle = "dodgerblue";
+    context.fillStyle = "darkturquoise";
     context.fillRect(
         player.x - player.offset_x,
         player.y - player.offset_y,
@@ -384,7 +385,7 @@ function draw_frame() {
     );
     
     //draw bullets
-    context.fillStyle = "darkorange";
+    context.fillStyle = "black";
     bullets.forEach((b) => {
         context.beginPath();
         context.arc(b.x, b.y, 3, 0, 2 * Math.PI, false);
@@ -432,7 +433,7 @@ function draw_frame() {
         "ammo: " + player.ammo),
         5, 30);
     context.fillText(
-        (player.health > 0 ? "health: " + player.health : "you're dead!"),
+        ("bot is playing right now."),
         5, 50);
     context.fillText("score: " + score, 5, 70);
 }
