@@ -16,12 +16,17 @@ var bot = {
         
         //get the monsters whose y values are within 15 of the player's x
         if (monsters.filter((m) => {
-            if (Math.abs(m.y - player.y) < m.offset / 2) {
-                return true;
-            } else {
-                return false;
-            }
-        }).length > 0 && Math.abs(this.last_y - player.y) > 2 * player.offset_y) {
+                if (Math.abs(m.y - player.y) < m.offset / 2) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }).length > 0 &&
+            bullets.filter((b) => {
+                //bullet already fired at that y value? if so, don't fire.
+                return Math.abs(b.y - player.y) < Monster.prototype.offset;
+            }).length == 0
+        ){
             player.fire();
             this.last_y = player.y;
         }
@@ -31,21 +36,21 @@ var bot = {
             if (keys.up) {
                 //match the x of one that's above the bot
                 var targets = objects.filter((o) => {
-                    return o.y < player.y;
+                    return o.y < player.y && Math.abs(o.x - player.x) < Math.abs(o.y - player.y);
                 });
                 
                 //find the one with the smallest y
-                targets.sort((a, b) => { return a.y - b.y; });
+                targets.sort((a, b) => { return b.y - a.y; });
                 
                 this.target_ammo = targets[0];
             } else {
                 //the bot is moving down
                 var targets = objects.filter((o) => {
-                    return o.y > player.y;
+                    return o.y > player.y && Math.abs(o.x - player.x) < Math.abs(o.y - player.y);
                 });
                 
                 //find the one with the smallest y
-                targets.sort((a, b) => { return b.y - a.y; });
+                targets.sort((a, b) => { return a.y - b.y; });
                 
                 this.target_ammo = targets[0];
             }
