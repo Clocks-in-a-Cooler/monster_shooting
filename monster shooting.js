@@ -106,13 +106,20 @@ var player   = {
     health: null,
     speed: 0.2,
     
-    offset_x: 10,
+    //animation related
+    pose: 0,
+    move_time: 0,
+    pose_delay: 250,
+    
+    offset_x: 8,
     offset_y: 15,
     
     fire: function() {
         if (this.ammo > 0) {
             bullets.push(new Bullet(this.x + this.offset_x, this.y));
             this.ammo--;
+        } else {
+            texts.push(new Text("no ammo!", this.x, this.y, 1500));
         }
     },
     
@@ -136,6 +143,20 @@ var player   = {
         this.x = Math.min(this.x, 200 - this.offset_x);
         this.y = Math.max(this.y, this.offset_y);
         this.y = Math.min(this.y, height - this.offset_y);
+        
+        //update the pose, if necessary
+        if (keys.left || keys.right || keys.up || keys.down) {
+            this.move_time += lapse;
+            
+            if (Math.floor(this.move_time / this.pose_delay) % 2 == 0) {
+                this.pose = 2;
+            } else {
+                this.pose = 1;
+            }
+        } else {
+            this.move_time = 0;
+            this.pose      = 0;
+        }
         
         if (this.health <= 0) {
             end_game();
@@ -171,13 +192,17 @@ function Monster(x, y) {
     this.x = x;
     this.y = y;
     
+    this.speed = 0.025 + Math.random() * 0.025;
+    
+    this.pose      = 0;
+    this.pose_time = 0;
+    
     this.lifetime = 0;
     this.active   = true;
 }
 
-Monster.prototype.speed  = 0.05;
-Monster.prototype.step   = 125;
-Monster.prototype.offset = 15;
+Monster.prototype.pose_delay = 167;
+Monster.prototype.offset     = 15;
 
 Monster.prototype.update = function(lapse) {
     //monsters move toward the left
@@ -199,8 +224,13 @@ Monster.prototype.update = function(lapse) {
         
         score++;
         
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.15) {
             objects.push(new Ammo_box(
+                Math.random() * 200,
+                Math.random() * height
+            ));
+        } else if (Math.random() < 1 / 17) {
+            objects.push(new Health_box(
                 Math.random() * 200,
                 Math.random() * height
             ));
@@ -209,18 +239,35 @@ Monster.prototype.update = function(lapse) {
         this.active = false;
     }
     
+    if (
+        Math.abs(player.x - this.x) < this.offset + player.offset_x &&
+        Math.abs(player.y - this.y) < this.offset + player.offset_y
+    ) {
+        texts.push(new Text("-1 health", this.x, this.y, 1500));
+        player.collision();
+        this.active = false;
+    }
+    
     if (this.x < 0) {
         this.active = false;
-        score--;
+        score -= 10;
+    }
+    
+    //now update the pose
+    this.pose_time += lapse;
+    if (this.pose_time >= this.pose_delay) {
+        this.pose_time = 0;
+        this.pose++;
+        this.pose = this.pose % 4;
     }
 };
 
 var spawn_time = null;
 
-function spawn_monster() {
+function spawn_monster(time) {
     monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
     
-    spawn_time += Math.random() * 1500;
+    spawn_time = time + Math.random() * 1500;
 }
 
 function Ammo_box(x, y) {
@@ -247,6 +294,33 @@ Ammo_box.prototype.update = function(lapse) {
         texts.push(new Text("+10 ammo", this.x, this.y, 1500));
     }
 };
+
+function Health_box(x, y) {
+    this.x = x;
+    this.y = y;
+    
+    this.active = true;
+}
+
+Health_box.prototype.offset = 10;
+
+Health_box.prototype.update = function(lapse) {
+    if (
+        this.x > player.x - this.offset - player.offset_x &&
+        this.y > player.y - this.offset - player.offset_y &&
+        this.x < player.x + this.offset + player.offset_x &&
+        this.y < player.y + this.offset + player.offset_y
+    ) {
+        this.active = false;
+        if (player.health <= 13) {
+            player.health += 2;
+            texts.push(new Text("+2 health", this.x, this.y, 1500));
+        } else {
+            player.ammo += 10;
+            texts.push(new Text("+10 ammo", this.x, this.y, 1500));
+        }
+    }
+}
 
 function Text(text, x, y, lifetime) {
     //text: 8 pixels per character in Arial at 12 pts
@@ -293,9 +367,9 @@ function animate(time) {
         
         if (spawn_time == null) {
             spawn_time = time;
-            spawn_monster();
+            spawn_monster(time);
         } else if (spawn_time < time) {
-            spawn_monster();
+            spawn_monster(time);
         }
     }
     
@@ -319,6 +393,34 @@ function cycle(lapse) {
     texts.forEach((t) => { t.update(lapse); });
 }
 
+// sprites ---------------------------------------------------------------------
+var player_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/player.png";
+    return elt;
+})();
+
+var player_sprite_width = 10, player_sprite_height = 15;
+
+var bullet_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/bullet.png";
+    return elt;
+})();
+
+var monster_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/monster.png";
+    return elt;
+})();
+
+var crate_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/crates.png";
+    return elt;
+})();
+
+// drawing ---------------------------------------------------------------------
 function draw_frame() {
     context.clearRect(0, 0, width, height);
     
@@ -331,43 +433,43 @@ function draw_frame() {
     context.stroke();
     
     //draw the player
-    context.fillStyle = "dodgerblue";
-    context.fillRect(
+    context.drawImage(
+        player_sprite,
+        0, 2 * player_sprite_height * player.pose,
+        2 * player_sprite_width, 2 * player_sprite_height,
         player.x - player.offset_x,
         player.y - player.offset_y,
-        player.offset_x * 2,
-        player.offset_y * 2
+        2 * player.offset_x,
+        2 * player.offset_y
     );
     
     //draw bullets
-    context.fillStyle = "darkorange";
     bullets.forEach((b) => {
-        context.beginPath();
-        context.arc(b.x, b.y, 3, 0, 2 * Math.PI, false);
-        context.closePath();
-        context.fill();
+        context.drawImage(bullet_sprite, b.x - 3, b.y - 2);
     });
     
     //draw monsters
-    context.fillStyle = "crimson";
     monsters.forEach((m) => {
-        context.fillRect(
-            m.x - m.offset,
-            m.y - m.offset,
-            m.offset * 2,
-            m.offset * 2,
+        context.drawImage(
+            monster_sprite,
+            0, 2 * m.offset * m.pose,
+            2 * m.offset, 2 * m.offset,
+            m.x - m.offset, m.y - m.offset,
+            2 * m.offset, 2 * m.offset
         );
     });
     
     //draw ammo boxes
-    context.fillStyle = "forestgreen";
     objects.forEach((o) => {
-        context.fillRect(
-            o.x - o.offset,
-            o.y - o.offset,
-            o.offset * 2,
-            o.offset * 2
-        );
+        if (o instanceof Ammo_box) {
+            context.drawImage(crate_sprite, 0, 0, 20, 20,
+                o.x - o.offset, o.y - o.offset, o.offset * 2, o.offset * 2);
+        }
+        
+        if (o instanceof Health_box) {
+            context.drawImage(crate_sprite, 0, 20, 20, 20,
+                o.x - o.offset, o.y - o.offset, o.offset * 2, o.offset * 2);
+        }
     });
     
     //draw the texts
@@ -385,5 +487,8 @@ function draw_frame() {
         "no ammo? you're screwed!" :
         "ammo: " + player.ammo),
         5, 30);
-    context.fillText("score: " + score, 5, 50);
+    context.fillText(
+        (player.health > 0 ? "health: " + player.health : "you're dead!"),
+        5, 50);
+    context.fillText("score: " + score, 5, 70);
 }
