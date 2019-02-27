@@ -119,12 +119,12 @@ var player   = {
             bullets.push(new Bullet(this.x + this.offset_x, this.y));
             this.ammo--;
         } else {
-            texts.push(new Text("no ammo!", this.x, this.y, 1500));
+            texts.push(new Text("no ammo!", this.x, this.y, 1500, {r: 255, g: 140, b: 0}));
         }
     },
     
-    collision: function() {
-        this.health--;
+    collision: function(h) {
+        this.health -= h == undefined ? 1 : h;
     },
     
     update: function(lapse) {
@@ -243,7 +243,7 @@ Monster.prototype.update = function(lapse) {
         Math.abs(player.x - this.x) < this.offset + player.offset_x &&
         Math.abs(player.y - this.y) < this.offset + player.offset_y
     ) {
-        texts.push(new Text("-1 health", this.x, this.y, 1500));
+        texts.push(new Text("-1 health", this.x, this.y, 1500, {r: 220, g: 20, b: 60}));
         player.collision();
         this.active = false;
     }
@@ -262,14 +262,77 @@ Monster.prototype.update = function(lapse) {
     }
 };
 
+//bigger monster!
+function Big_monster(x, y) {
+    this.x = x; this.y = y;
+    
+    this.health    = this.max_health;
+    this.pose      = 0;
+    this.pose_time = 0;
+    this.active    = true;
+}
+
+Big_monster.prototype.speed      = 0.01;
+Big_monster.prototype.pose_delay = 167;
+Big_monster.prototype.offset     = 30;
+Big_monster.prototype.max_health = 10;
+
+Big_monster.prototype.update = function(lapse) {
+    this.pose_time += lapse;
+    if (this.pose_time >= this.pose_delay) {
+        this.pose_time = 0;
+        this.pose++;
+        this.pose = this.pose % 4;
+    }
+    
+    this.x -= this.speed * lapse;
+    
+    //check for bullet collision
+    var blt = bullets.filter((b) => {
+        return (b.x > this.x - this.offset &&
+            b.x < this.x + this.offset &&
+            b.y > this.y - this.offset &&
+            b.y < this.y + this.offset);
+    });
+    
+    if (blt.length > 0) {
+        this.health--;
+        
+        if (this.health <= 0) {
+            this.active = false;
+            score += 15;
+            
+            //spawn three boxes to reward the player
+            objects.push(new Health_box(Math.random() * 200, Math.random() * height));
+            objects.push(new Health_box(Math.random() * 200, Math.random() * height));
+            objects.push(new Health_box(Math.random() * 200, Math.random() * height));
+        }
+        
+        blt.forEach((b) => { b.collision(); });
+    }
+    
+    //check for player collision
+    if (
+        Math.abs(this.x - player.x) < this.offset + player.offset_x &&
+        Math.abs(this.y - player.y) < this.offset + player.offset_y
+    ) {
+        player.health = 0;
+    }
+};
+
 var spawn_time = null;
 
 function spawn_monster(time) {
-    monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
+    if (Math.random() < 0.1 && score > 50) {
+        monsters.push(new Big_monster(width, 30 + Math.random() * (height - 60)));
+    } else {
+        monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
+    }
     
     spawn_time = time + Math.random() * 1500;
 }
 
+//ammo box
 function Ammo_box(x, y) {
     this.x = x;
     this.y = y;
@@ -295,6 +358,7 @@ Ammo_box.prototype.update = function(lapse) {
     }
 };
 
+//health box
 function Health_box(x, y) {
     this.x = x;
     this.y = y;
@@ -314,7 +378,7 @@ Health_box.prototype.update = function(lapse) {
         this.active = false;
         if (player.health <= 13) {
             player.health += 2;
-            texts.push(new Text("+2 health", this.x, this.y, 1500));
+            texts.push(new Text("+2 health", this.x, this.y, 1500, {r: 0, g: 255, b: 127}));
         } else {
             player.ammo += 10;
             texts.push(new Text("+10 ammo", this.x, this.y, 1500));
@@ -322,7 +386,7 @@ Health_box.prototype.update = function(lapse) {
     }
 }
 
-function Text(text, x, y, lifetime) {
+function Text(text, x, y, lifetime, colour) {
     //text: 8 pixels per character in Arial at 12 pts
     //so for 16pt, it's about 11 pixels per character
     this.text = text;
@@ -334,6 +398,15 @@ function Text(text, x, y, lifetime) {
     this.life     = 0;
     this.active   = true;
     
+    if (colour) {
+        this.r = colour.r;
+        this.g = colour.g;
+        this.b = colour.b;
+    } else {
+        this.r = 186;
+        this.g = 85;
+        this.b = 211;
+    }
     this.alpha = 1;
 }
 
@@ -414,6 +487,12 @@ var monster_sprite = (function() {
     return elt;
 })();
 
+var big_monster_sprite = (function() {
+    var elt = document.createElement("img");
+    elt.src = "sprites/big_monster.png"
+    return elt;
+})();
+
 var crate_sprite = (function() {
     var elt = document.createElement("img");
     elt.src = "sprites/crates.png";
@@ -450,13 +529,31 @@ function draw_frame() {
     
     //draw monsters
     monsters.forEach((m) => {
-        context.drawImage(
-            monster_sprite,
-            0, 2 * m.offset * m.pose,
-            2 * m.offset, 2 * m.offset,
-            m.x - m.offset, m.y - m.offset,
-            2 * m.offset, 2 * m.offset
-        );
+        if (m instanceof Monster) {
+            context.drawImage(
+                monster_sprite,
+                0, 2 * m.offset * m.pose,
+                2 * m.offset, 2 * m.offset,
+                m.x - m.offset, m.y - m.offset,
+                2 * m.offset, 2 * m.offset
+            );
+        }
+        
+        if (m instanceof Big_monster) {
+            context.drawImage(
+                big_monster_sprite,
+                0, 2 * m.offset * m.pose,
+                2 * m.offset, 2* m.offset,
+                m.x - m.offset, m.y -m.offset,
+                2 * m.offset, 2 * m.offset
+            );
+            //then draw its health bar
+            context.fillStyle = "maroon";
+            context.fillRect(
+                m.x - m.offset, m.y - m.offset - 8,
+                m.health * 6 , 5
+            );
+        }
     });
     
     //draw ammo boxes
@@ -475,7 +572,7 @@ function draw_frame() {
     //draw the texts
     texts.forEach((t) => {
         context.font      = "14pt Arial";
-        context.fillStyle = "rgba(186, 85, 211, " + t.alpha + ")";
+        context.fillStyle = "rgba("+ t.r + ", " + t.g + ", " + t.b + ", " + t.alpha + ")";
         context.fillText(t.text, t.x, t.y);
     });
     
