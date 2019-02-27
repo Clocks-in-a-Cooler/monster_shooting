@@ -119,7 +119,7 @@ var player   = {
             bullets.push(new Bullet(this.x + this.offset_x, this.y));
             this.ammo--;
         } else {
-            texts.push(new Text("no ammo!", this.x, this.y, 1500));
+            texts.push(new Text("no ammo!", this.x, this.y, 1500, {r: 255, g: 140, b: 0}));
         }
     },
     
@@ -272,7 +272,7 @@ function Big_monster(x, y) {
     this.active    = true;
 }
 
-Big_monster.prototype.speed      = 0.1;
+Big_monster.prototype.speed      = 0.01;
 Big_monster.prototype.pose_delay = 167;
 Big_monster.prototype.offset     = 30;
 Big_monster.prototype.max_health = 10;
@@ -308,7 +308,7 @@ Big_monster.prototype.update = function(lapse) {
             objects.push(new Health_box(Math.random() * 200, Math.random() * height));
         }
         
-        blt.forEach((b) => { b.collsion(); });
+        blt.forEach((b) => { b.collision(); });
     }
     
     //check for player collision
@@ -323,7 +323,11 @@ Big_monster.prototype.update = function(lapse) {
 var spawn_time = null;
 
 function spawn_monster(time) {
-    monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
+    if (Math.random() < 0.1 && score > 50) {
+        monsters.push(new Big_monster(width, 30 + Math.random() * (height - 60)));
+    } else {
+        monsters.push(new Monster(width, 15 + Math.random() * (height - 30)));
+    }
     
     spawn_time = time + Math.random() * 1500;
 }
@@ -485,7 +489,8 @@ var monster_sprite = (function() {
 
 var big_monster_sprite = (function() {
     var elt = document.createElement("img");
-    elt.src = "sprites/big_monster
+    elt.src = "sprites/big_monster.png"
+    return elt;
 })();
 
 var crate_sprite = (function() {
@@ -524,13 +529,31 @@ function draw_frame() {
     
     //draw monsters
     monsters.forEach((m) => {
-        context.drawImage(
-            monster_sprite,
-            0, 2 * m.offset * m.pose,
-            2 * m.offset, 2 * m.offset,
-            m.x - m.offset, m.y - m.offset,
-            2 * m.offset, 2 * m.offset
-        );
+        if (m instanceof Monster) {
+            context.drawImage(
+                monster_sprite,
+                0, 2 * m.offset * m.pose,
+                2 * m.offset, 2 * m.offset,
+                m.x - m.offset, m.y - m.offset,
+                2 * m.offset, 2 * m.offset
+            );
+        }
+        
+        if (m instanceof Big_monster) {
+            context.drawImage(
+                big_monster_sprite,
+                0, 2 * m.offset * m.pose,
+                2 * m.offset, 2* m.offset,
+                m.x - m.offset, m.y -m.offset,
+                2 * m.offset, 2 * m.offset
+            );
+            //then draw its health bar
+            context.fillStyle = "maroon";
+            context.fillRect(
+                m.x - m.offset, m.y - m.offset - 8,
+                m.health * 6 , 5
+            );
+        }
     });
     
     //draw ammo boxes
