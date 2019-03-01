@@ -1,14 +1,41 @@
 
+var start_button;
+var overlay, overlay_opacity;
+var start_game_screen, start_screen_opacity;
+var end_game_screen, end_screen_opacity;
+var score_counter;
+
 var canvas;
 var context;
 var width, height;
 
 function init() {
+    //set up the various elements
+    overlay           = document.getElementById("overlay");
+    start_game_screen = document.getElementById("start-screen");
+    start_button      = document.querySelector("button");
+    end_game_screen   = document.getElementById("game-over");
+    score_counter     = document.getElementById("score-counter");
+    
+    overlay_opacity      = 1;
+    start_screen_opacity = 1;
+    end_screen_opacity   = 0;
+    
     canvas  = document.querySelector("canvas");
     context = canvas.getContext("2d");
     
     canvas.width  = width  = window.innerWidth;
     canvas.height = height = window.innerHeight;
+    
+    //set up an event listener on the start button
+    start_button.addEventListener("click", start_game);
+    
+    status = "pregame";
+}
+
+function start_game() {
+    //remove the event listener from the start button
+    start_button.removeEventListener("click", start_game);
     
     //set up the player and stuff
     player.x      = 30;
@@ -19,20 +46,14 @@ function init() {
     //set up the event handlers
     addEventListener("keydown", keydown);
     addEventListener("keyup", keyup);
-    addEventListener("keyup", function(e) {
-        if (e.keyCode == 80) {
-            paused = !paused;
-        } else if (e.code == "Space") {
-            player.fire();
-        }
-    });
     
     requestAnimationFrame(animate);
 }
 
 function end_game() {
-    playing = false;
-    alert("game over. score: " + score);
+    status = "game over";
+    
+    score_counter.innerHTML = "game over.\nscore: " + score;
 }
 
 // event handlers --------------------------------------------------------------
@@ -87,6 +108,12 @@ function keyup(e) {
         case 39:
         case 68:
             keys.right = false;
+            break;
+        case 80:
+            paused = !paused;
+            break;
+        case 32:
+            player.fire();
             break;
     }
 }
@@ -275,7 +302,7 @@ function Big_monster(x, y) {
 Big_monster.prototype.speed      = 0.01;
 Big_monster.prototype.pose_delay = 167;
 Big_monster.prototype.offset     = 30;
-Big_monster.prototype.max_health = 10;
+Big_monster.prototype.max_health = 15;
 
 Big_monster.prototype.update = function(lapse) {
     this.pose_time += lapse;
@@ -300,11 +327,12 @@ Big_monster.prototype.update = function(lapse) {
         
         if (this.health <= 0) {
             this.active = false;
-            score += 15;
+            score += 25;
             
             //spawn three boxes to reward the player
-            objects.push(new Health_box(Math.random() * 200, Math.random() * height));
-            objects.push(new Health_box(Math.random() * 200, Math.random() * height));
+            objects.push(new Ammo_box(Math.random() * 200, Math.random() * height));
+            objects.push(new Ammo_box(Math.random() * 200, Math.random() * height));
+            objects.push(new Ammo_box(Math.random() * 200, Math.random() * height));
             objects.push(new Health_box(Math.random() * 200, Math.random() * height));
         }
         
@@ -316,7 +344,9 @@ Big_monster.prototype.update = function(lapse) {
         Math.abs(this.x - player.x) < this.offset + player.offset_x &&
         Math.abs(this.y - player.y) < this.offset + player.offset_y
     ) {
-        player.health = 0;
+        player.health -= this.health;
+        texts.push(new Text("-" + this.health + " health", this.x, this.y, 1500, { r: 220, g: 20, b: 60 }));
+        this.active = false;
     }
 };
 
@@ -425,7 +455,7 @@ Text.prototype.update = function(lapse) {
 // animation loop --------------------------------------------------------------
 var last_time = null, lapse = 0;
 var paused    = false;
-var playing   = true;
+var status    = "";
 
 function animate(time) {
     if (last_time == null) {
@@ -435,7 +465,7 @@ function animate(time) {
     }
     last_time = time;
     
-    if (!paused && playing) {
+    if (!paused && (status == "playing" || status == "pregame")) {
         cycle(lapse);
         
         if (spawn_time == null) {
@@ -443,6 +473,45 @@ function animate(time) {
             spawn_monster(time);
         } else if (spawn_time < time) {
             spawn_monster(time);
+        }
+    }
+    
+    if (status == "pregame") {
+        //the screens will take 1.5 seconds to fade. that's 0.006 per 10 ms
+        overlay_opacity      -= (lapse / 10) * 0.006;
+        start_screen_opacity -= (lapse / 10) * 0.006;
+        
+        overlay.style.opacity           = overlay_opacity;
+        start_game_screen.style.opacity = start_screen_opacity;
+        
+        if (start_screen_opacity < 0) { //they'll disappear
+            overlay.style.visibility        = "hidden";
+            overlay_opacity                 = 0;
+            start_game_screen.style.opacity = "hidden";
+            start_screen_opacity            = 0;
+            
+            status = "playing";
+        }
+    }
+    
+    if (status == "game over") {
+        overlay_opacity    += (lapse / 10) * 0.006;
+        end_screen_opacity += (lapse / 10) * 0.006;
+        
+        end_game_screen.style.visibility = "visible";
+        overlay.style.visibility         = "visible";
+        
+        overlay.style.opacity         = overlay_opacity;
+        end_game_screen.style.opacity = end_screen_opacity;
+        
+        if (end_screen_opacity > 1) { //they'll appear
+            overlay_opacity    = 1;
+            end_screen_opacity = 1;
+            
+            overlay.style.opacity         = overlay_opacity;
+            end_game_screen.style.opacity = end_screen_opacity;
+            
+            status = "";
         }
     }
     
@@ -515,11 +584,10 @@ function draw_frame() {
     context.drawImage(
         player_sprite,
         0, 2 * player_sprite_height * player.pose,
-        2 * player_sprite_width, 2 * player_sprite_height,
+        20, 2 * player.offset_y,
         player.x - player.offset_x,
         player.y - player.offset_y,
-        2 * player.offset_x,
-        2 * player.offset_y
+        20, 2 * player.offset_y
     );
     
     //draw bullets
@@ -548,10 +616,15 @@ function draw_frame() {
                 2 * m.offset, 2 * m.offset
             );
             //then draw its health bar
-            context.fillStyle = "maroon";
+            context.fillStyle = "mediumspringgreen";
             context.fillRect(
                 m.x - m.offset, m.y - m.offset - 8,
-                m.health * 6 , 5
+                m.health * 4 , 5
+            );
+            context.fillStyle = "darkkhaki";
+            context.fillRect(
+                m.x - m.offset + m.health * 4, m.y - m.offset - 8,
+                (m.max_health - m.health) * 4, 5
             );
         }
     });
